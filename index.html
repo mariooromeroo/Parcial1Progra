@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quejas Ciudadanas</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+        body { background: #f0f2f5; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        
+        h1 { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; text-align: center; color: #333; font-size: 1.8rem; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        
+        main { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .card h2 { margin-bottom: 15px; padding-bottom: 8px; border-bottom: 1px solid #ddd; font-size: 1.3rem; display: flex; justify-content: space-between; align-items: center; }
+        
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; color: #555; font-weight: bold; font-size: 0.9rem; }
+        input, select, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: #0066cc; }
+        
+        .error { color: #dc2626; font-size: 0.8rem; margin-top: 3px; display: block; }
+        input.error, select.error, textarea.error { border-color: #dc2626; background: #fff5f5; }
+        
+        button { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-primary { background: #0066cc; color: white; width: 100%; padding: 10px; }
+        .btn-primary:hover { background: #0052a3; }
+        .btn-danger { background: #dc2626; color: white; padding: 5px 10px; font-size: 0.9rem; }
+        .btn-danger:hover { background: #b91c1c; }
+        
+        #quejasContainer { max-height: 500px; overflow-y: auto; }
+        .empty { text-align: center; color: #999; padding: 40px; background: #f9f9f9; border-radius: 4px; border: 1px dashed #ccc; }
+        
+        @media (max-width: 700px) { main { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Sistema de Quejas Ciudadanas</h1>
+        
+        <main>
+            <!-- FORMULARIO -->
+            <div class="card">
+                <h2>Nueva queja</h2>
+                <form id="formQueja">
+                    <div class="form-group">
+                        <label>Nombre:</label>
+                        <input type="text" id="nombre" placeholder="Ej: Juan Pérez">
+                        <span class="error" id="errorNombre"></span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Tipo:</label>
+                        <select id="tipo">
+                            <option value="">-- Seleccione --</option>
+                            <option value="Baches">Baches</option>
+                            <option value="Alumbrado">Alumbrado</option>
+                            <option value="Basura">Basura</option>
+                            <option value="Parques">Parques</option>
+                        </select>
+                        <span class="error" id="errorTipo"></span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Ubicación:</label>
+                        <input type="text" id="ubicacion" placeholder="Ej: Colonia Centro">
+                        <span class="error" id="errorUbicacion"></span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Descripción:</label>
+                        <textarea id="descripcion" rows="2" placeholder="Describa el problema..."></textarea>
+                        <span class="error" id="errorDescripcion"></span>
+                    </div>
+                    
+                    <button type="submit" class="btn-primary">Enviar queja</button>
+                </form>
+            </div>
+            
+            <!-- HISTORIAL -->
+            <div class="card">
+                <h2>
+                    Historial
+                    <button class="btn-danger" id="btnBorrar">Borrar todo</button>
+                </h2>
+                <div id="quejasContainer"></div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // WebComponent simple
+        class QuejaCard extends HTMLElement {
+            constructor() {
+                super();
+                this.attachShadow({ mode: 'open' });
+            }
+            
+            connectedCallback() {
+                const nombre = this.getAttribute('nombre') || 'Anónimo';
+                const tipo = this.getAttribute('tipo') || 'General';
+                const ubicacion = this.getAttribute('ubicacion') || 'N/A';
+                const desc = this.getAttribute('descripcion') || 'Sin descripción';
+                const fecha = this.getAttribute('fecha') || new Date().toLocaleString();
+                
+                this.shadowRoot.innerHTML = `
+                    <style>
+                        .card { background: #f0f7ff; border: 1px solid #cce5ff; border-radius: 6px; padding: 12px; margin-bottom: 10px; }
+                        .header { display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: bold; }
+                        .fecha { font-size: 0.7rem; color: #666; }
+                        .detalle { font-size: 0.9rem; margin: 5px 0; }
+                    </style>
+                    <div class="card">
+                        <div class="header">
+                            <span>👤 ${nombre}</span>
+                            <span class="fecha">${fecha}</span>
+                        </div>
+                        <div class="detalle"> ${tipo} |  ${ubicacion}</div>
+                        <div class="detalle" style="background:white; padding:8px; border-radius:4px; margin-top:5px;">📝 ${desc}</div>
+                    </div>
+                `;
+            }
+        }
+        customElements.define('queja-card', QuejaCard);
+
+        // Datos
+        let quejas = JSON.parse(localStorage.getItem('quejas')) || [];
+        const form = document.getElementById('formQueja');
+        const container = document.getElementById('quejasContainer');
+        const btnBorrar = document.getElementById('btnBorrar');
+
+        // Mostrar quejas
+        function mostrarQuejas() {
+            container.innerHTML = '';
+            if (quejas.length === 0) {
+                container.innerHTML = '<div class="empty">No hay quejas registradas</div>';
+                return;
+            }
+            quejas.forEach(q => {
+                const card = document.createElement('queja-card');
+                card.setAttribute('nombre', q.nombre);
+                card.setAttribute('tipo', q.tipo);
+                card.setAttribute('ubicacion', q.ubicacion);
+                card.setAttribute('descripcion', q.descripcion);
+                card.setAttribute('fecha', q.fecha);
+                container.appendChild(card);
+            });
+        }
+
+        // Validar campos
+        function validarCampo(id, condicion, mensaje) {
+            const campo = document.getElementById(id);
+            const error = document.getElementById('error' + id.charAt(0).toUpperCase() + id.slice(1));
+            const valor = campo.value.trim();
+            const valido = condicion(valor);
+            
+            campo.classList.toggle('error', !valido);
+            error.textContent = valido ? '' : mensaje;
+            return valido;
+        }
+
+        // Enviar formulario
+        form.addEventListener('submit', function(e) {
+            e.preventDefault(); // IMPORTANTE: evita que la página se recargue
+            
+            const valNombre = validarCampo('nombre', v => v.length >= 3, 'Mínimo 3 caracteres');
+            const valTipo = validarCampo('tipo', v => v !== '', 'Seleccione una opción');
+            const valUbicacion = validarCampo('ubicacion', v => v.length >= 5, 'Mínimo 5 caracteres');
+            const valDesc = validarCampo('descripcion', v => v.length >= 10, 'Mínimo 10 caracteres');
+            
+            if (valNombre && valTipo && valUbicacion && valDesc) {
+                const nuevaQueja = {
+                    nombre: document.getElementById('nombre').value.trim(),
+                    tipo: document.getElementById('tipo').value,
+                    ubicacion: document.getElementById('ubicacion').value.trim(),
+                    descripcion: document.getElementById('descripcion').value.trim(),
+                    fecha: new Date().toLocaleString()
+                };
+                
+                quejas.unshift(nuevaQueja);
+                localStorage.setItem('quejas', JSON.stringify(quejas));
+                mostrarQuejas();
+                form.reset();
+                
+                // Limpiar errores
+                document.querySelectorAll('.error').forEach(e => e.textContent = '');
+                document.querySelectorAll('input, select, textarea').forEach(e => e.classList.remove('error'));
+            }
+        });
+
+        // Borrar historial
+        btnBorrar.addEventListener('click', function() {
+            if (quejas.length === 0) {
+                alert('No hay quejas para borrar');
+                return;
+            }
+            if (confirm('¿Borrar todas las quejas?')) {
+                quejas = [];
+                localStorage.removeItem('quejas');
+                mostrarQuejas();
+            }
+        });
+
+        // Cargar quejas al iniciar
+        mostrarQuejas();
+    </script>
+</body>
+</html>
